@@ -1,0 +1,326 @@
+---
+title: "rapor"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+# BÖLÜM 5: WİNTERS ÜSTEL DÜZLEŞTİRME YÖNTEMİ
+
+>Bu bölüme kadar anlatılan yöntemler, zaman içinde değişmeyen parametre
+varsayımına uygun serilerin tahminlerinde kullanılmaktaydı. Bir başka
+deyişle, bu tür seriler _deterministik_ trende sahipti. Ancak birçok zaman serisinin hareketi regresyon doğrusuna ya da eğrisine dönme eğilimi göstermemektedir.
+Yani, zaman içinde serinin trend yapısı rasgele değişebilmektedir. Bu durumda, regresyon katsayısı sabit bir değer değil her t zamanında
+değişen değerlere sahip rasgele bir değişken olmaktadır. Böyle bir serinin tahınininin yapılabilmesi için elde edilen son gözlem (T' inci döneme ait gözlem) değeri ile son döneme ait tahminin güncelleştirilmiş hali kullanılır.
+
+>Bu bölümde, zaman içinde değişen parametrelere sahip olan ve bir regresyon doğrusuna ya da eğrisine dönme eğilimi olmadığından tek bir regresyon doğrusu ya da eğrisiyle açıklanamayan, yani kısaca _stokastik trende_ sahip olan serilerin analizi üzerinde durulacaktır.
+
+
+>Zaman Serileri için Üstel Düzleştirme Yöntemi, serinin mevsimsel olup olmamasına göre değişiklik göstermektedir.
+
+>>**Sadece trende sahip seriler (Mevsimsel olmayan) için;**<br/>
+Basit Üstel Düzleştirme Yöntemi<br/>
+Holt Üstel Düzleştirme Yöntemi
+gibi yöntemler kullanılabilir.
+
+>>**Hem trende hem de mevsimselliğe sahip seriler için** ise Winters Üstel Düzleştirme Yöntemini uygulayabiliriz. 
+
+
+>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+**[Buradaki](#mevsimsellik) başlıkta; Trende sahip serinin birinci farkını aldığımızda serinin aynı zamanda mevsimselliğe sahip olduğunu ACF grafiğine bakarak açıklamıştık.**
+
+>Kullandığımız veri mevsimselliğe sahip olduğu için bu bölümde sadece **Winters Üstel Düzleştirme Yöntemi** gösterilecektir.
+
+
+>Winters Üstel Düzleştirme Yöntemi için aşağıdaki formüller kullanılacaktır:
+
+![ ](https://raw.githubusercontent.com/gungorrbaris/TR-time.series.analysis-R/main/png/ortalama%20d%C3%BCzeyin%20g%C3%BCncelle%C5%9Ftirilmesi.png)
+
+![ ](https://raw.githubusercontent.com/gungorrbaris/TR-time.series.analysis-R/main/png/Seri%20E%C4%9Filiminin%20g%C3%BCncelle%C5%9Ftirilmesi.png)
+
+![ ](https://raw.githubusercontent.com/gungorrbaris/TR-time.series.analysis-R/main/png/mevsimsel%20bile%C5%9Fenin%20g%C3%BCncellenmesi.png)
+
+![ ](https://raw.githubusercontent.com/gungorrbaris/TR-time.series.analysis-R/main/png/g%C3%B6zlem%20tahminleri.png)
+
+>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+
+## 5.1 Toplamsal Winters Yöntemi
+
+Verilerin trend’den bağımsız ve mevsimsel hareketlerin büyüklüğünün zaman içinde sabit olduğu varsayılır.
+
+
+### 5.1.1 α, β ve γ'nın Belirlenmesi:
+
+Kurulan model toplamsal model olacağı için fonksiyon içindeki model değişkeni "AAA" olmalıdır. 
+
+```{r}
+Winters1<- forecast::ets(veri_ts, model = "AAA")
+summary(Winters1)
+```
+
+**Model çıktısına bakıldığında:**
+
+- l = 142359.4408 -> ortalama düzeyin başlangıç değeridir.
+
+- b = 650.5006   -> eğimin başlangıç değeridir. 
+
+- s değerine bakıldığında ise 12 farklı değer (periyot sayımız 12 olduğu için) vardır. Bu değerler mevsimsel terimin başlangıç değerleridir.
+Başlangıç değerleri kullanılarak Optimal düzleştirme katsayıları,
+   * α = 0.35
+   * β = 0.0015
+   * γ = 0.376  olarak elde edilmiştir. 
+
+#### Toplamsal Winters Modeli HKO
+- Hata kareler ortalaması-HKO = 6965.969^2 bulunmuştur. 
+ 
+
+### 5.1.2 Tahmin, ACF ve Dağılım Grafikleri:
+
+
+```{r}
+library(forecast)
+checkresiduals(Winters1, lag = 42)
+```
+
+### 5.1.3 Tahmin ve Hata Serilerinin Bulunması:
+
+α, β ve γ düzleştirme katsayıları kullanılarak serinin tahmin değerleri aşağıdaki gibi bulunabilir. 
+
+
+```{r}
+tahmin_win1<- Winters1[["fitted"]]
+```
+
+
+**Tahmin edilen ilk 12 değeri (2022 yılı ABD elektrik tüketim tahminlerini) görelim:**
+
+```{r}
+ongoru1 <- forecast(Winters1,h=12)
+knitr::kable(ongoru1[["mean"]],col.names = "2022 yılı ABD elektrik tüketimi - Toplamsal Winters Tahminleri", align = "c")
+```
+
+
+**Tahmin ve Orijinal serileri birlikte çizdirelim:**
+
+
+```{r}
+plot( window(veri_ts), 
+      xlab="Zaman", ylab="",lty=1, col=4, lwd=2)
+lines( window(tahmin_win1) ,lty=3,col=2,lwd=3)
+legend("topleft",c(expression(paste(Elektrik_Tuketimi)),
+               expression(paste(Top.Winters_Tahmini))),
+       lwd=c(2,2),lty=c(1,3), cex=0.7, col=c(4,2))
+```
+
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Tahmin ile orijinal seri arasında **uyum olduğu** görülmektedir. Yani görsel olarak Toplamsal Winters yöntemi ile yapılan tahminlerin gerçeğe yakın olduğunu söyleyebiliriz. 
+
+- Fakat emin olmak için hataların akgürültü olup olmadığına bakmamız gerekmektedir.
+
+**Hata Serisi:**
+
+>α, β ve γ düzleştirme katsayıları kullanılarak serinin hata değerleri aşağıdaki gibi bulunabilir.
+
+```{r}
+hata_win1<- Winters1[["residuals"]]
+plot.ts(hata_win1)
+```
+
+
+### Hatalar Akgürültü mü? 
+
+
+>> Ho: Hatalar Akgürültüdür.(Hatalar arasında ilişki yoktur.) <br/>
+H1: Hatalar Akgürültü değildir.(Hatalar arasında ilişki vardır.)
+
+
+**Hatalar için ACF Grafiği:**
+
+```{r}
+Acf(hata_win1, lag.max = 42,  ylim=c(-1,1), lwd=5,main="Hatalar için ACF Grafiği")
+```
+
+
+**Hatalar için ACF Grafiğine bakıldığında:**
+
+- İlk dört gecikmeden üç tanesinin sınırları geçtiği, birinin sınırlar içinde kaldığı görülmektedir. 
+
+- Hataların akgürültü olduğunu söyleyebiliriz. Yani Hatalar arasında ilişki yoktur. Kurulan model tahmin etmede kullanılabilir. 
+
+
+## 5.2.4 SONUÇ
+
+**Bir önceki adımda görüldüğü üzere;** 
+
+- _Hatalar Arasında ilişki olmadığını yani hataların akgürültü olduğunu gördük._ 
+
+- _**Sonuç olarak ABD'deki aylık elektrik tüketimi serisinin Regresyon analizi için kullanılan Toplamsal Winters Üstel Düzleştirme Yöntemi uygundur.**_
+
+
+
+## 5.2 Çarpımsal Winters Yöntemi
+
+Mevsimsel hareketlerin trende bağlı olarak değiştiği ve trendin bir çarpanı olduğu varsayılmaktadır. Genellikle çarpımsal model tercih edilmektedir.
+
+
+### 5.2.1 α, β ve γ'nın Belirlenmesi:
+
+Kurulan model çarpımsal model olacağı için fonksiyon içindeki model değişkeni "MAM" olmalıdır. 
+
+```{r}
+Winters2<- forecast::ets(veri_ts, model = "MAM")
+summary(Winters2)
+```
+
+**Model çıktısına bakıldığında:**
+
+- l = 141713.6213 -> ortalama düzeyin başlangıç değeridir.
+
+- b = 564.3679    -> eğimin başlangıç değeridir. 
+
+- s değerine bakıldığında ise 12 farklı değer (periyot sayımız 12 olduğu için) vardır. Bu değerler mevsimsel terimin başlangıç değerleridir.
+Başlangıç değerleri kullanılarak Optimal düzleştirme katsayıları,
+   * α = 0.3292
+   * β = 0
+   * γ = 0.2528    olarak elde edilmiştir.
+
+#### Çarpımsal Winters Modeli HKO
+- Hata kareler ortalaması-HKO = 6176.062^2 bulunmuştur. 
+ 
+
+### 5.2.2 Tahmin, ACF ve Dağılım Grafikleri:
+
+
+```{r}
+library(forecast)
+checkresiduals(Winters2, lag = 42)
+```
+
+### 5.2.3 Tahmin ve Hata Serilerinin Bulunması:
+
+α, β ve γ düzleştirme katsayıları kullanılarak serinin tahmin değerleri aşağıdaki gibi bulunabilir. 
+
+
+```{r}
+tahmin_win2<- Winters2[["fitted"]]
+```
+
+
+**Tahmin edilen ilk 12 değeri (2022 yılı ABD elektrik tüketim tahminlerini) görelim:**
+
+```{r}
+ongoru2 <- forecast(Winters2,h=12)
+knitr::kable(ongoru2[["mean"]],col.names = "2022 yılı ABD elektrik tüketimi - Çarpımsal Winters Tahminleri", align = "c")
+```
+
+
+**Tahmin ve Orijinal serileri birlikte çizdirelim:**
+
+
+```{r}
+plot( window(veri_ts), 
+      xlab="Zaman", ylab="",lty=1, col=4, lwd=2)
+lines( window(tahmin_win2) ,lty=3,col=2,lwd=3)
+legend("topleft",c(expression(paste(Elektrik_Tuketimi)),
+               expression(paste(Çar.Winters_Tahmini))),
+       lwd=c(2,2),lty=c(1,3), cex=0.7, col=c(4,2))
+```
+
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Tahmin ile orijinal seri arasında **uyum olduğu** görülmektedir. Yani görsel olarak Çarpımsal Winters yöntemi ile yapılan tahminlerin gerçeğe yakın olduğunu söyleyebiliriz. 
+
+- Fakat emin olmak için hataların akgürültü olup olmadığına bakmamız gerekmektedir.
+
+**Hata Serisi:**
+
+>α, β ve γ düzleştirme katsayıları kullanılarak serinin hata değerleri aşağıdaki gibi bulunabilir.
+
+```{r}
+hata_win2<- Winters2[["residuals"]]
+plot.ts(hata_win2)
+```
+
+
+### Hatalar Akgürültü mü? 
+
+
+>> Ho: Hatalar Akgürültüdür.(Hatalar arasında ilişki yoktur.) <br/>
+H1: Hatalar Akgürültü değildir.(Hatalar arasında ilişki vardır.)
+
+
+**Hatalar için ACF Grafiği:**
+
+```{r}
+Acf(hata_win2, lag.max = 42,  ylim=c(-1,1), lwd=5,main="Hatalar için ACF Grafiği")
+```
+
+
+**Hatalar için ACF Grafiğine bakıldığında:**
+
+- İlk dört gecikmeden üç tanesinin sınırları geçtiği, birinin sınırlar içinde kaldığı görülmektedir. 
+
+- Hataların akgürültü olduğunu söyleyebiliriz. Yani Hatalar arasında ilişki yoktur. Kurulan model tahmin etmede kullanılabilir. 
+
+
+## 5.2.4 SONUÇ
+
+**Bir önceki adımda görüldüğü üzere;** 
+
+- _Hatalar Arasında ilişki olmadığını yani hataların akgürültü olduğunu gördük._ 
+
+- _**Sonuç olarak ABD'deki aylık elektrik tüketimi serisinin Regresyon analizi için kullanılan Çarpımsal Winters Üstel Düzleştirme Yöntemi uygundur.**_
+
+## 5.3 Peki hangi model daha iyi?
+
+winters yöntemlerinde kullanılan iki yöntemin de yaptıkları tahminlerin orijinal seri ile karşılaştırmasında uyumlu sonuçlar verdiğini ve bu modellerin tahmin için kullanılabileceğini gördük.
+
+**Toplamsal ve Çarpımsal Winters 2022 Tahminleri:**
+
+```{r}
+ongoru2022 <- as.data.frame(cbind(ongoru1[["mean"]],ongoru2[["mean"]]))
+colnames(ongoru2022) <- c("Toplamsal Winters", "Çarpımsal Winters")
+knitr::kable(ongoru2022, align = "c")
+```
+
+
+- İki modelin de 2022 yılı elektrik kullanımı tahminlerinin yakın olduğunu söyleyebiliriz. 
+
+>Peki hangi model bu veri için daha iyi?
+
+Bu durumda iki yöntemin de HKO (Hata Kareler Ortalaması) değerlerine bakmamız gerekir. 
+
+Toplamsal Winters Yöntemi [HKO](#toplamsal-winters-modeli-hko) = 6965.969^2 <br/>
+Çarpımsal Winters Yöntemi [HKO](#çarpımsal-winters-modeli-hko) = 6176.062^2
+
+**Çarpımsal Winters yönteminin HKO'sı, Toplamsal Winters yönteminden küçük olduğu için; Çarpımsal Winters yöntemi seriyi tahmin etmek için daha uygun olan yöntemdir. **
+
+## 5.Bölüm Özet
+
+Bu bölümde; Mevsimsel seriler için kullanılan Üstel Düzleştirme yöntemleri ile ABD'deki aylık elektrik tüketimini tahmin etmeye çalıştık. Uyguladığımız iki model de veriyi tahmin etmede iyi sonuçlar verdi. Bu iki model arasında Hata Kareler Ortalaması daha küçük olan Çarpımsal Winters yönteminin daha iyi olduğu sonucuna vardık.
+
+Sonuç olarak ABD'deki aylık elektrik tüketimi serisinin tahmini için  Winters Üstel Düzleştirme yöntemleri uygundur ve kullanılabilir.
+
+
+
+
+
+
+
+
+
+
+
+
+
+

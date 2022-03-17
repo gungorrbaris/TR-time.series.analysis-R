@@ -1,0 +1,156 @@
+---
+title: "rapor"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+
+
+# BÖLÜM 2: ANALİZE GİRİŞ - SERİNİN HAZIRLANMASI
+
+## 2.1 Zaman Serisinin Oluşturulması
+
+```{r}
+veri_ts <- ts(data = veri$Elektrik_Tuketimi, start = c(1973, 01), end = c(2021, 11), frequency = 12 )
+```
+
+Verimizde gözlemler aylık olduğu için frekans değeri (frequency) 12 olarak belirlenmelidir.
+
+
+## 2.2 Zaman Serisi Grafiğinin Çizilmesi
+
+```{r}
+library(foreach)
+
+ts.plot(veri_ts,gpars=list(xlab="Zaman", ylab="Elektrik Tüketimi"))
+```
+
+
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Pozitif yönlü artış vardır. Bu yüzden Serinin artan bir **trende sahip** olduğunu söyleyebiliriz.
+
+- Seride düzenli dalgalanmaların olduğu görülmektedir. Bu seride **mevsimsellik** olabileceğini gösterir.
+Daha kesin sonuç için ACF grafiğini çizelim.
+
+
+## 2.3 ACF Grafiğinin Çizilmesi
+
+
+### ! BİLGİ !
+>_**Gecikmeli seri:** Serilerdeki verilerin dönem kaydırılması işlemi ile ortaya çıkan serilerdir. Zt bir zaman serisi değişkeni ise; bir dönem gecikmeli zaman serisi Zt-1, iki dönem gecikmeli Zt-2 ve k dönem gecikmeli Zt-k ile gösterilir._
+
+>_**Otokorelasyon katsayısı:** Zaman serileri ile bu serilerin gecikmeli serileri arasındaki ilişkileri verir._ 
+
+>_**ACF:** Otokorelasyon fonksiyonu (Autocorrelation function) demektir. Otokorelasyon katsayısı değerlerinden oluşur._
+
+
+
+>**Seride trendin olduğunu anlamak için ACF grafiğindeki ilk dört gecikmeye bakmak yeterlidir. İlk dört gecikme sınırlar dışındaysa seri için "trende sahiptir" diyebiliriz.**
+
+```{r}
+library(fpp)
+Acf(veri_ts,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Orijinal veri ACF Grafiği")
+```
+
+
+**ACF Grafiğine bakıldığında:**
+
+- Tüm gecikmeler (4 gecikme olması yeterlidir) sınırlar dışında olduğu için zaman serisinin **trende sahip** olduğu söylenebilir. Bu yüzden serinin farkı alınıp durağan hale getirilmelidir.
+
+- Trend ile birlikte düzenli dalgalanmaların olduğu gözükse de baskın bir mevsimsellikten şu an için bahsedemeyiz. 
+
+## 2.4 Birinci Farkın Alınması
+
+### ! BİLGİ !
+>_**Fark Alınması:** Zaman serisinin akışkanlı bir şekilde  son değerlerinden belli bir dönem önceki değerlerinin çıkarılması işlemidir. Bu işlem sayesinde serideki trend ya da mevsimsel dalgalanmaları yok etmek mümkün olmaktadır._
+
+
+```{r}
+veri_birinci_fark <- diff(veri_ts, differences = 1)
+```
+
+### 2.4.1 Farkı alınmış seri için ACF:
+```{r}
+Acf(veri_birinci_fark,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Birinci Fark sonrası ACF Grafiği")
+```
+
+### MEVSİMSELLİK
+**Birinci Farkı alınmış seri için ACF Grafiğine bakıldığında:**
+
+- Yine tüm gecikmeler sınırlar dışında olduğu için birinci farkı alınmış zaman serisinin de trende sahip olduğu söylenebilir. Fakat bir öncekine göre bu ACF grafiğinde baskın bir **mevsimsellik** görülüyor. Dalgalanmalar ve gecikmelerde olan düzenli sıçramalar bunu destekliyor.  
+
+## 2.5 Birinci Mevsimsel Farkın Alınması
+
+### ! BİLGİ !
+>_**Mevsimsel Farkın Alınması:** Normal fark işleminden tek farkı periyodunun işleme dahil edilmesidir._
+
+### Periyodun bulunması:
+- _Kullandığımız veri aylık olduğu için periyodunun 12 olduğunu biliyoruz._
+- _Periyodun bilinmediği durumlar için en iyi yöntem ACF değerlerine bakmaktır._
+
+**ACF ile periyodun bulunması:**
+```{r}
+Acf(veri_birinci_fark,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Birinci Fark sonrası ACF Grafiği",plot=FALSE)
+```
+
+>_İhtiyacımız olan en büyük ve en büyük ikinci değer arasında kaç gecikmenin olduğunu bulmaktır. (Burada ilk değer dahil edilmemelidir.)_
+
+**ACF değerlerine bakıldığında:**
+
+- En büyük değerin 12. gecikme (0.910), en büyük ikinci gecikmenin ise 24. gecikme (0.874) olduğu gözükmektedir. 
+
+- 12 ve 24 gecikme arasında toplam 12 değer olduğu için; birinci farkı alınmış serinin **periyodunun 12 olduğunu söyleyebiliriz**. 
+
+### 2.5.2 Mevsimsel Fark İşlemi:
+
+```{r}
+veri_ts_mev1 <- diff(veri_birinci_fark,12)
+
+```
+
+
+### 2.5.3 Mevsimsel Farkı alınmış seri için ACF:
+
+```{r}
+Acf(veri_ts_mev1,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Birinci Mevsimsel Fark sonrası ACF Grafiği")
+```
+
+
+**Birinci Mevsimsel Farkı alınmış seri için ACF Grafiğine bakıldığında:**
+
+- İlk dört gecikmeden sadece iki tanesi sınırları geçtiği için **trendin kaybolduğunu** söyleyebiliriz.
+
+- Düzenli dalgalanmaların dolayısıyla **mevsimselliğin de kaybolduğunu** söyleyebiliriz. 
+
+
+## 2.6 Durağanlık
+
+>**Durağanlık;** Zaman serisi verilerinin belirli bir zaman sürecinde sürekli artma veya azalmanın olmadığı, verilerin zaman boyunca bir yatay eksen boyunca saçılım göstermesi olarak tanımlanır. Genel bir tanımlama ile, sabit ortalama, sabit varyans ve seriye ait iki değer arasındaki farkın zamana değil, yalnızca iki zaman değeri arasındaki farka bağlı olması şeklinde ifade edilir.
+
+>Eğer bir seri durağan ise serinin beklenen değeri ve varyansı sabit, kovaryansı zamandan
+bağımsız sadece gecikme sayısına dayalı olmalıdır. Dolayısıyla,
+
+> E(Zt) = μ <br/>
+V(Zt) = σ^2 <br/>
+cov(Zt,Zt+k) = γ <br/>
+eşitliklerinin hepsi sağlanmalıdır.
+
+>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+### Seri Neden Durağan Omalı?
+
+- Zaman serisi ile ilgili yapılan çalışmalar serinin Durağan olduğunu varsayar. Çünkü bir zaman serisi durağan değilse, serinin davranışını sadece ele alınan dönem için inceleyebiliriz.
+
+- **Dolayısıyla Bundan sonraki İşlemlerde durağan hale getirilen (Bir normal, bir mevsimsel fark işleminden sonra) seri üzerinden analiz yapılacaktır. **
+
+
+

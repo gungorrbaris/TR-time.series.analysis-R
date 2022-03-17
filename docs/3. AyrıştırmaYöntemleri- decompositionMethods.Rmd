@@ -1,0 +1,535 @@
+---
+title: "rapor"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+
+# BÖLÜM 3: AYRIŞTIRMA YÖNTEMLERİ
+
+>Zaman serisini bileşenlerine ayırarak her bir bileşen için
+tahminleri içeren ve bu bileşenlerin tahmininden zaman serisinin öngörüsünü hesaplayan yönteme **Ayrıştırma Yöntemi** denmektedir. 
+
+>Ayrıştırma yöntemi genel olarak iki sınıfa ayrılabilir.<br/> 
+1.Toplamsal Ayrıştırma Yöntemi<br/> 
+2.Çarpımsal Ayrıştırma Yöntemi
+
+
+# 3.1 Toplamsal Ayrıştırma Yöntemi
+
+>Toplamsal model; zaman serisinin, bileşenlerin toplamından oluştuğunu kabul eder.<br/>
+Zt = Tt + Mt + εt
+
+>Matematiksel olarak,  Zt=f(Tt, Mt , Ct, εt) şeklinde gösterilip tahmini ise : Z =f(Tt, Mt , Ct)’dir. Bilinen en eski öngörü yöntemlerinden olup kısa dönemli öngörülerde anlaşılması ve yapılması en kolay yöntemdir. Trende ve Mevsimselliğe sahip verilerde kullanılır.
+
+## 3.1.1 Trend Bileşeni ve Periyodun Bulunması
+
+**Trend Bileşeni:**
+
+>Serinin Trend Bileşeni Regresyon analizi yardımı ile oluşturulur.
+
+```{r}
+veri_trend <- tslm(veri_ts~trend)
+```
+
+
+- _Burada dikkat edilmesi gereken, denkleme orijinal serinin eklenmiş olmasıdır._
+
+- Oluşturulan Regresyon denklemindeki **fitted.values** değişkeni dikkate alınır.
+
+- **fitted.values** değişkeni orijinal serinin trend bileşeni olur.
+
+
+```{r}
+head(veri_trend[["fitted.values"]],n=36)
+```
+
+
+**Periyodun Bulunması:**
+
+>Orijinal zaman Serisi ve trend bileşeninin farkını alarak periyodu bulabiliriz.
+
+```{r}
+periyot_trend <- veri_ts - veri_trend[["fitted.values"]]
+```
+
+
+Serinin periyoduna sahip mevsimsel bileşen serisinin ACF değerleri ile periyodu bulalım:
+
+```{r}
+Acf(periyot_trend,lag.max = 42,  ylim=c(-1,1), lwd=5,plot=FALSE)
+```
+**ACF değerlerine bakıldığında:**
+
+- En büyük değerin 12. gecikme (0.916), en büyük ikinci gecikmenin ise 24. gecikme (0.853) olduğu gözükmektedir. 
+
+- 12 ve 24 gecikme arasında toplam 12 değer olduğu için; birinci farkı alınmış serinin **periyodunun 12 olduğunu söyleyebiliriz**. 
+
+**[Buradaki](#periyodun-bulunması) başlıkta periyot bulma işlemini yapmış ve aynı sonuca ulaşmıştık. **
+
+
+> Mevsimsel, döngüsel veya düzensiz dalgalanmaları yok etme ya da belli
+bir miktar düzleştirme amacıyla **basit hareketli ortalama** ya da **merkezsel hareketli ortalama** işlemlerine ihtiyaç duyulmaktadır.
+
+> Ayrıştırma Yönteminde **merkezsel hareketli ortalamayı** mevsimsel bileşeni bulmak için kullanacağız.
+
+## 3.1.2 Merkezsel Hareketli Ortalama Hesabı
+
+```{r}
+veri_trend_1 <- ma(veri_ts, order = 12, centre = TRUE)
+```
+
+>>Burada order = germe sayısı, bir önceki adımda bulduğumuz periyot ile aynı olmalıdır.
+
+
+## 3.1.3 Mevsimsel Bileşenin Bulunması
+
+>Mevsimsel bileşene ulaşmak için yukarıda hesapladığımız merkezsel hareketli ortalama serisini, orijinal seriden çıkartmamız gerekiyor.
+
+```{r}
+mevsim3 <- veri_ts - veri_trend_1
+head(mevsim3,n=36)
+```
+
+## 3.1.4 Mevsim serisinin ortalamaları
+
+>Mevsimsel bileşendeki hata teriminin yok edilebilmesi için her bir periyottaki dönemlerin ortalama değerleri hesaplanır.
+
+```{r}
+donemort3<-t(matrix(data=mevsim3, nrow = 12))
+head(donemort3)
+```
+
+**Periyottaki dönemlerin ortalama değerleri:**
+
+```{r}
+colMeans(donemort3, na.rm = T)
+```
+
+
+**Periyottaki dönemlerin ortalama değerlerinin toplamı:**
+
+```{r}
+sum(colMeans(donemort3, na.rm = T))
+```
+
+>Bu değerin 0 olması gerekmektedir. 0 olmadığı için ortalamaların ortalaması alınmalıdır. Bu ortalama değer diğer tüm ortalama değerlerden çıkartılır ve mevsimsel endeks serisi bulunur. 
+
+
+**Periyottaki dönemlerin ortalama değerlerinin ortalaması:**
+```{r}
+mean(colMeans(donemort3, na.rm = T))
+```
+
+## 3.1.5 Mevsimsel Endeksin Bulunması
+
+```{r}
+endeks1 <- colMeans(donemort3, na.rm = T) - mean(colMeans(donemort3, na.rm = T))
+
+endeks1
+```
+>>Bu 12 mevsimsel endeks değeri periyottaki dönemlere dikkat edilerek (ilk döneme karşılık M1; ikinci döneme karşılık M2; üçüncü
+döneme karşılık M3, ... , on ikinci döneme karşılık M12 gelecek şekilde) seri boyunca tekrar tekrar yazılabilmesi için aşağıdaki adım gerçekleştirilir.
+
+**İndeks Değerlerini Seri Boyunca Yazdırma İşlemi:**
+
+```{r}
+indeks<-  matrix(data = endeks1, nrow = 587)
+head(indeks)
+```
+
+## 3.1.6 Hata Terimli Trend Bileşeninin Bulunması
+
+```{r}
+trendhata <- veri_ts - indeks
+```
+
+**Hata Terimli Trend Bileşeninine ait zaman serisi grafiği:**
+
+```{r}
+plot.ts(trendhata)
+```
+
+
+>>Elde edilen bu trent serisinde hata terimi de olduğundan seriye ''trendhata'' adı verilir. Bu seriyi hata teriminden arındırabilmek amacıyla trendhata serisine doğrusal regresyon uygulanır.
+
+```{r}
+trend1<-tslm(ts(trendhata)~trend)
+```
+
+- Burada fitted.values değişkeni dikkate alınır. 
+
+- fitted.values değişkeni orijinal serinin trend bileşeni olur.
+
+```{r}
+head(trend1[["fitted.values"]],n=24)
+```
+
+## 3.1.7 Tahmin ve Hata Serilerinin Bulunması
+
+**Tahmin Bileşenlerini Bulalım:**
+
+>>tahmin = mevsimsel endeks + saf trend serisi
+
+```{r}
+tahmin<- indeks+trend1[["fitted.values"]]
+tahmin <- ts(data = tahmin, start = c(1973, 01), end = c(2021, 11), frequency = 12 )
+plot(tahmin,main = "Tahmin Serisi Grafiği")
+```
+
+**Hata Bileşenlerini Bulalım:**
+
+>>hata = saf trend serisi - tahmin 
+
+```{r}
+hata <- ts(veri_ts) - ts(tahmin)
+plot(hata,main = "Tahmin serisi için Hata Serisi Grafiği")
+```
+
+## 3.1.8 Modelin Güvenirliği 
+
+>Toplamsal modelin orijinal seri üzerinde geçerli bir model olup olmadığını kontrol edelim. 
+
+**Orijinal seri ile tahmin serisinin uyumu:**
+
+```{r}
+plot( window(veri_ts), 
+      xlab="Zaman", ylab="",lty=1, col=4, lwd=2,main="Orijinal Seri ve Tahmin Serisinin Birlikte Grafiği")
+lines( window(tahmin) ,lty=3,col=2,lwd=3)
+legend("topleft",c(expression(paste(OrijinalSeri )),
+                   expression(paste(Tahmin ))),
+       lwd=c(2,2),lty=c(1,3), cex=0.6, col=c(4,2))
+
+```
+
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Tahmin ile orijinal seri arasında sapmanın yüksek olduğunu dolayısıyla **uyum göstermediğini** söyleyebiliriz. 
+
+- Fakat emin olmak için hataların akgürültü olup olmadığına bakabiliriz.
+
+### Hatalar Akgürültü mü? 
+
+### ! BİLGİ !
+>_**Akgürültü Serisi:** Durağanlık koşullarından tek farkı
+kovaryans teriminin sıfır olmasıdır. Dolayısıyla, akgürültü serisi durağan bir seriden farklı özellikler gösterir. <br/> Örneğin, akgürültü serisi rasgele hareketlere sahip modellenemez bir seri iken durağan serilerin hareketlerinin belli bir sistematiği vardır ve bu nedenle modellenebilmektedir. Akgürültü serisinin tüm gecikmelerindeki otokorelasyon ve kısmi otokorelasyon değerleri önemsizdir._
+
+> ACF ve PACF grafıklerinin yorumunda serinin akgürültü serisi olup olmadığına net bir şekilde karar verilemiyorsa, yani ACF veya PACF grafiklerinde birinci gecikme dışında az sayıda güven sınırını biraz geçen ilişkiler var ise bu durumda seriye Box-Ljung Testi uygulanır.
+
+>Eğer her gecikme için Box-Ljung Testi sonucunda **Ho : rk = 0** yokluk hipotezi kabul edilirse serinin akgürültü serisi olduğu söylenir.
+
+>>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+>> Ho: Hatalar Akgürültüdür.(Hatalar arasında ilişki yoktur.) <br/>
+H1: Hatalar Akgürültü değildir.(Hatalar arasında ilişki vardır.)
+
+
+**Hatalar için ACF Grafiği:**
+
+```{r}
+Acf(hata, lag.max = 42,  ylim=c(-1,1), lwd=5,main="Hatalar için ACF Grafiği")
+```
+
+
+**Hatalar için ACF Grafiğine bakıldığında:**
+
+- Tüm gecikmelerin sınırları geçtiği gözükmektedir.
+
+- Hataların akgürültü olmadığı (Ho RED) Söylenebilir. Box-Ljung testi ile de bunu görebiliriz.
+
+**Box-Ljung Testi:** 
+```{r}
+Box.test(hata,type = "Ljung",lag = 42)
+```
+
+**Box-Ljung test sonucuna bakıldığında:**
+
+- p değeri = 0 < α =0.05 'dir. Yani Ho RED.
+
+- Hatalar Arasında **ilişki olduğunu** yani hataların *akgürültü olmadığını* söyleyebiliriz.
+
+
+## 3.1.9 SONUÇ
+
+**Bir önceki adımda görüldüğü üzere;** 
+
+- _Hatalar Arasında ilişki olduğunu yani hataların akgürültü olmadığını gördük._ 
+
+- _**Sonuç olarak ABD'deki aylık elektrik tüketimi serisinin analizi için Toplumsal Ayrıştırma yöntemi uygun değildir. **_
+
+
+
+# 3.2 Çarpımsal Ayrıştırma Yöntemi
+
+>Çarpımsal model; zaman serisinin, bileşenlerin çarpımından oluştuğunu kabul eder.<br/>
+Zt = Tt * Mt + εt
+
+>Matematiksel olarak Toplamsal ayrıştıma yönteminden tek farkı: <br/>
+- Mevsimsel bileşen, trend bileşeni, endeks, trend hata, ve tahmin değişkenlerini hesaplarken, "-" yerine "/" ; "+" yerine "*" kullanılmasıdır.
+
+## 3.2.1 Trend Bileşeni ve Periyodun Bulunması
+
+**Trend Bileşeni:**
+
+>Serinin Trend Bileşeni Regresyon analizi yardımı ile oluşturulur.
+
+```{r}
+veri_trend2 <- tslm(veri_ts~trend)
+```
+
+
+- _Burada dikkat edilmesi gereken, denkleme orijinal serinin eklenmiş olmasıdır._
+
+- Oluşturulan Regresyon denklemindeki **fitted.values** değişkeni dikkate alınır.
+
+- **fitted.values** değişkeni orijinal serinin trend bileşeni olur.
+
+
+```{r}
+head(veri_trend2[["fitted.values"]],n=36)
+```
+
+
+**Periyodun Bulunması:**
+
+>Orijinal zaman Serisi ve trend bileşeninin farkını alarak periyodu bulabiliriz.
+
+```{r}
+periyot_trend2 <- veri_ts - veri_trend2[["fitted.values"]]
+```
+
+
+Serinin periyoduna sahip mevsimsel bileşen serisinin ACF değerleri ile periyodu bulalım:
+
+```{r}
+Acf(periyot_trend2,lag.max = 42,  ylim=c(-1,1), lwd=5,plot=FALSE)
+```
+**ACF değerlerine bakıldığında:**
+
+- En büyük değerin 12. gecikme (0.916), en büyük ikinci gecikmenin ise 24. gecikme (0.853) olduğu gözükmektedir. 
+
+- 12 ve 24 gecikme arasında toplam 12 değer olduğu için; birinci farkı alınmış serinin **periyodunun 12 olduğunu söyleyebiliriz**. 
+
+**[Buradaki](#periyodun-bulunması) başlıkta periyot bulma işlemini yapmış ve aynı sonuca ulaşmıştık. **
+
+
+>> Mevsimsel, döngüsel veya düzensiz dalgalanmaları yok etme ya da belli
+bir miktar düzleştirme amacıyla **basit hareketli ortalama** ya da **merkezsel hareketli ortalama** işlemlerine ihtiyaç duyulmaktadır.
+
+> Ayrıştırma Yönteminde **merkezsel hareketli ortalamayı** mevsimsel bileşeni bulmak için kullanacağız
+
+## 3.2.2 Merkezsel Hareketli Ortalama Hesabı
+
+```{r}
+veri_trend_2 <- ma(veri_ts, order = 12, centre = TRUE)
+```
+
+>>Burada order = germe sayısı, bir önceki adımda bulduğumuz periyot ile aynı olmalıdır.
+
+
+## 3.2.3 Mevsimsel Bileşenin Bulunması
+
+>Mevsimsel bileşene ulaşmak için yukarıda hesapladığımız merkezsel hareketli ortalama serisini, orijinal seriden bölmemiz gerekiyor.
+
+```{r}
+mevsim4 <- veri_ts / veri_trend_2
+head(mevsim4,n=36)
+```
+
+## 3.2.4 Mevsim serisinin ortalamaları
+
+>Mevsimsel bileşendeki hata teriminin yok edilebilmesi için her bir periyottaki dönemlerin ortalama değerleri hesaplanır.
+
+```{r}
+donemort4<-t(matrix(data=mevsim4, nrow = 12))
+head(donemort4)
+```
+
+**Periyottaki dönemlerin ortalama değerleri:**
+
+```{r}
+colMeans(donemort4, na.rm = T)
+```
+
+
+**Periyottaki dönemlerin ortalama değerlerinin toplamı:**
+
+```{r}
+sum(colMeans(donemort4, na.rm = T))
+```
+
+>Bu değerin 0 olması gerekmektedir. 0 olmadığı için ortalamaların ortalaması alınmalıdır. Bu ortalama değer diğer tüm ortalama değerlere bölünür ve mevsimsel endeks serisi bulunur. 
+
+
+**Periyottaki dönemlerin ortalama değerlerinin ortalaması:**
+```{r}
+mean(colMeans(donemort4, na.rm = T))
+```
+
+## 3.2.5 Mevsimsel Endeksin Bulunması
+
+```{r}
+endeks2 <- colMeans(donemort4, na.rm = T) / mean(colMeans(donemort4, na.rm = T))
+
+endeks2
+```
+>>Bu 12 mevsimsel endeks değeri periyottaki dönemlere dikkat edilerek (ilk döneme karşılık M1; ikinci döneme karşılık M2; üçüncü
+döneme karşılık M3, ... , on ikinci döneme karşılık M12 gelecek şekilde) seri boyunca tekrar tekrar yazılabilmesi için aşağıdaki adım gerçekleştirilir.
+
+**Mevsimsel Endeksin ortalaması:**
+>> Mevsimsel endekin ortalaması yani Dönem ortalamalarının ortalaması 1'e eşit olmalıdır.
+
+```{r}
+mean(endeks2)
+```
+
+- Dönem ortalamalarının ortalaması 1'e eşittir. Bu hata yapmadığımızı gösterir.
+
+**İndeks Değerlerini Seri Boyunca Yazdırma İşlemi:**
+
+```{r}
+indeks2<-  matrix(data = endeks2, nrow = 587)
+head(indeks2)
+```
+
+## 3.2.6 Hata Terimli Trend Bileşeninin Bulunması
+
+```{r}
+trendhata2 <- veri_ts / indeks2
+```
+
+**Hata Terimli Trend Bileşeninine ait zaman serisi grafiği:**
+
+```{r}
+plot.ts(trendhata2)
+```
+>>Elde edilen bu trent serisinde hata terimi de olduğundan seriye ''trendhata2'' adı verilir. Bu seriyi hata teriminden arındırabilmek amacıyla trendhata serisine doğrusal regresyon uygulanır.
+
+```{r}
+trend2<-tslm(ts(trendhata2)~trend)
+```
+
+- Burada fitted.values değişkeni dikkate alınır. 
+
+- fitted.values değişkeni orijinal serinin trend bileşeni olur.
+
+```{r}
+head(trend2[["fitted.values"]],n=24)
+```
+
+## 3.2.7 Tahmin ve Hata Serilerinin Bulunması
+
+**Tahmin Bileşenlerini Bulalım:**
+
+>>tahmin = mevsimsel endeks + saf trend serisi
+
+```{r}
+tahmin2<- indeks2*trend2[["fitted.values"]]
+tahmin2 <- ts(data = tahmin2, start = c(1973, 01), end = c(2021, 11), frequency = 12 )
+plot(tahmin2,main = "Tahmin Serisi Grafiği")
+```
+
+**Hata Bileşenlerini Bulalım:**
+
+>>hata = saf trend serisi - tahmin 
+
+```{r}
+hata2 <- ts(veri_ts) - ts(tahmin2)
+plot(hata2,main = "Tahmin serisi için Hata Serisi Grafiği")
+```
+
+## 3.2.8 Modelin Güvenirliği 
+
+>Çarpımsal modelin orijinal seri üzerinde geçerli bir model olup olmadığını kontrol edelim. 
+
+**Orijinal seri ile tahmin serisinin uyumu:**
+
+```{r}
+plot( window(veri_ts), 
+      xlab="Zaman", ylab="",lty=1, col=4, lwd=2,main="Orijinal Seri ve Tahmin Serisinin Birlikte Grafiği")
+lines( window(tahmin2) ,lty=3,col=2,lwd=3)
+legend("topleft",c(expression(paste(OrijinalSeri )),
+                   expression(paste(Tahmin ))),
+       lwd=c(2,2),lty=c(1,3), cex=0.6, col=c(4,2))
+
+```
+
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Tahmin ile orijinal seri arasında sapmanın yüksek olduğunu dolayısıyla **uyum göstermediğini** söyleyebiliriz. 
+
+- Fakat emin olmak için hataların akgürültü olup olmadığına bakabiliriz.
+
+### Hatalar Akgürültü mü? 
+
+### ! BİLGİ !
+>_**Akgürültü Serisi:** Durağanlık koşullarından tek farkı
+kovaryans teriminin sıfır olmasıdır. Dolayısıyla, akgürültü serisi durağan bir seriden farklı özellikler gösterir. <br/> Örneğin, akgürültü serisi rasgele hareketlere sahip modellenemez bir seri iken durağan serilerin hareketlerinin belli bir sistematiği vardır ve bu nedenle modellenebilmektedir. Akgürültü serisinin tüm gecikmelerindeki otokorelasyon ve kısmi otokorelasyon değerleri önemsizdir._
+
+> ACF ve PACF grafıklerinin yorumunda serinin akgürültü serisi olup olmadığına net bir şekilde karar verilemiyorsa, yani ACF veya PACF grafiklerinde birinci gecikme dışında az sayıda güven sınırını biraz geçen ilişkiler var ise bu durumda seriye Box-Ljung Testi uygulanır.
+
+>Eğer her gecikme için Box-Ljung Testi sonucunda **Ho : rk = 0** yokluk hipotezi kabul edilirse serinin akgürültü serisi olduğu söylenir.
+
+>>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+>> Ho: Hatalar Akgürültüdür.(Hatalar arasında ilişki yoktur.) <br/>
+H1: Hatalar Akgürültü değildir.(Hatalar arasında ilişki vardır.)
+
+
+**Hatalar için ACF Grafiği:**
+
+```{r}
+Acf(hata2, lag.max = 42,  ylim=c(-1,1), lwd=5,main="Hatalar için ACF Grafiği")
+```
+
+
+**Hatalar için ACF Grafiğine bakıldığında:**
+
+- Tüm gecikmelerin sınırları geçtiği gözükmektedir.
+
+- Hataların akgürültü olmadığı (Ho RED) Söylenebilir. Box-Ljung testi ile de bunu görebiliriz.
+
+**Box-Ljung Testi:** 
+```{r}
+Box.test(hata2,type = "Ljung",lag = 42)
+```
+
+**Box-Ljung test sonucuna bakıldığında:**
+
+- p değeri = 0 < α =0.05 'dir. Yani Ho RED.
+
+- Hatalar Arasında **ilişki olduğunu** yani hataların *akgürültü olmadığını* söyleyebiliriz.
+
+
+## 3.2.9 SONUÇ
+
+**Bir önceki adımda görüldüğü üzere;** 
+
+- _Hatalar Arasında ilişki olduğunu yani hataların akgürültü olmadığını gördük._ 
+
+- _**Sonuç olarak ABD'deki aylık elektrik tüketimi serisinin analizi için Çarpımsal Ayrıştırma yöntemi uygun değildir. **_
+
+
+
+## 3.Bölüm Özet
+
+Bu bölümde; Ayrıştırma Yöntemleri ile ABD'deki aylık elektrik tüketimini tahmin etmeye çalıştık. Fakat uyguladığımız iki model de tahmin etmekte eksik kaldı.
+
+Bundan sonra sırasıyla:
+
+- Regresyon Analizi
+
+- Üstel Düzleştirme Yöntemi
+
+- Box-Jenkins Modelleri uygulanacaktır. 
+
+
+

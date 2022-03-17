@@ -1,0 +1,613 @@
+---
+title: "rapor"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+# BÖLÜM 4: MEVSİMSEL ZAMAN SERİLERİNDE REGRESYON ANALİZİ
+
+>Zaman Serileri için Regresyon Analizinde, serinin mevsimsel olup olmamasına göre yöntemler değişiklik göstermektedir.
+
+>>**Sadece trende sahip seriler (Mevsimsel olmayan) için;**<br/>
+Basit Doğrusal Regresyon<br/>
+Birinci Farklar Regresyon Modeli<br/>
+Üstel Regresyon Modeli<br/>
+Karesel Regresyon Modeli<br/>
+Lojistik Regresyon Modeli<br/>
+Kübik Regresyon Modeli<br/>
+gibi yöntemler kullanılabilir.
+
+>>**Hem trende hem de mevsimselliğe sahip seriler için** ise 3. Bölümde gördüğümüz Ayrıştırma Yöntemlerinden yararlanarak Regresyon analizini uygulayabiliriz. 
+
+>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+
+**[Buradaki](#mevsimsellik) başlıkta; Trende sahip serinin birinci farkını aldığımızda serinin aynı zamanda mevsimselliğe sahip olduğunu ACF grafiğine bakarak açıklamıştık.**
+
+>Kullandığımız veri mevsimselliğe sahip olduğu için bu bölümde sadece **Mevsimsel Serilerde Regresyon Analizi yöntemleri** gösterilecektir.
+
+
+
+
+## 4.1 Toplamsal Model İle Regresyon Analizi
+
+### ! BİLGİ !
+>Eğer bir seride hem trent hem de mevsimsellik var ise bu seriye uygulanacak regresyon modeli
+
+![ ](https://raw.githubusercontent.com/gungorrbaris/zaman-serisi-analizi-R/main/png/regresyonZS.png)
+
+biçiminde olmaktadır.
+
+>m: serinin trendinin yapısına göre polinom derecesidir.<br/>
+- m=l doğrusal trende sahip seri içindir.<br/>
+- m=2 karesel regresyona modeline uygun trende sahip seri içindir.<br/>
+- m=3 kübik regresyon modeline uygun trende sahip seri içindir.<br/>
+
+> Formüldeki ilk ∑ ifadesi: serinin trend bileşenini açıklar.
+
+> s:periyot olmak üzere [s /2] periyodun yarısının tamsayı kısmını gösterir. Örneğin, periyot 9 ise [s /2], 4 olmaktadır.
+
+> Burada j indisli toplam, yani köşeli parantez içindeki sinüs ve kosinüs fonksiyonları serinin mevsimsel bileşenini açıklamaktadır. Her regresyon modelinde olduğu gibi bu regresyon denkleminde de tüm katsayıların istatistiksel olarak önemli olması gerekmektedir.
+
+>Sinüs ve kosinüs çiftine harmonik adı verilmektedir. Böylece, j=l için birinci harmonik, j=2 için ikinci harmonik şeklinde j= [s /2] oluncaya kadar regresyon denklemine harmonik eklenir. Ancak her ekleme sonucunda ci ve di regresyon katsayılarının önemlilik kontrolü yapılır.
+
+>>Bu regresyon katsayılarından biri önemsiz olduğunda harmonik ekleme işlemine son verilir ve önemsiz olan regresyon katsayısına ait terim modelden atılarak serinin tahmininde katsayılarının hepsi önemli olan regresyon modeli kullanılır.
+
+
+>Uygulama verilerinde genellikle sadece birinci harmonikler seriyi açıklamada yeterli olmaktadır. Dolayısıyla, genellikle ikinci harmonikler regresyon modeline eklenmemektedir. Ayrıca, j= [s/2] için periyot çift sayı iken sinüs fonksiyonu, yani sin(nt) hep 0 değerini alacağından ilgili harmonikte sinüs serisinin oluşturulmamasına ve regresyon modeline eklenmemesine dikkat edilmelidir.
+
+>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+
+## 4.1.1 t, Sin ve Cos Terimlerinin oluşturulması
+
+_Serimiz, hem trende hem de mevsimsel dalgalanmaya sahip olduğundan regresyon modelinin; t, sinüs ve kosinüs terimlerini içermesi gerekmektedir._
+
+```{r}
+t <- 1: 1: 587
+```
+
+
+Veride 144 gözlem bulunduğu için bu değerler girilmiştir.
+
+
+```{r}
+sin1<-sin(2*3.1416*t/12)
+cos1<-cos(2*3.1416*t/12)
+```
+
+
+Sin ve Cos değerleri bulunurken yazılan formüldeki 12 değeri, daha önceki bölümlerde bulduğumuz periyottur. 
+ 
+**veri, t, sin ve cos terimleri ile yeni bir veri oluşturulur:**
+
+```{r}
+veri_mev_yeni <- as.data.frame(cbind(veri_ts, t, sin1, cos1))
+names(veri_mev_yeni)<- c("y", "t", "sin1", "cos1")
+
+knitr::kable(head(veri_mev_yeni), align = "c")
+```
+
+## 4.1.2 Regresyon Modelinin Oluşturulması
+
+### Birinci Harmonik
+
+Oluşturulan yeni veri ile regresyon analizi yapılır. 
+
+```{r}
+regresyon.model1<-lm(data = veri_mev_yeni, y ~ t+sin1+cos1)
+summary(regresyon.model1)
+```
+
+**Birinci Harmonik için Regresyon modeli sonucuna göre:**
+
+- Coefficients kısmındaki p değerlerinin hepsi < α =0.05 olduğundan, modeldeki **tüm terimlerin önemli olduğunu** söyleyebiliriz. 
+
+- p-value değeri < α =0.05 olduğundan kurulan **regresyon modelinin anlamlı olduğunu** söyleyebiliriz.
+
+
+### İkinci Harmonik
+
+Birinci harmonikte tüm terimler anlamlı çıktığından ikinci harmonikte de regresyon denklemine katılırlar. 
+
+**Sin, Cos Terimlerinin oluşturulması:**
+
+```{r}
+sin2<-sin(2*3.1416*2*t/12)
+cos2<-cos(2*3.1416*2*t/12)
+```
+
+
+**Yeni Verinin Oluşturulması:**
+
+Yeni veri oluşturulurken birinci harmonikte kullanılan sin ve cos değerleri de eklenir. 
+
+```{r}
+veri_mev_yeni2 <- as.data.frame(cbind(veri_ts, t, sin1, cos1, sin2, cos2))
+
+names(veri_mev_yeni2)<- c("y", "t", "sin1", "cos1", "sin2", "cos2")
+
+knitr::kable(head(veri_mev_yeni2), align = "c")
+```
+
+**İkinci Harmonik için regresyon modelinin kurulması:**
+
+```{r}
+regresyon.model2<-lm(data= veri_mev_yeni2, y ~ t+sin1+cos1+sin2+cos2)
+summary(regresyon.model2)
+```
+
+**İkinci Harmonik için Regresyon modeli sonucuna göre:**
+
+- Coefficients kısmındaki **cos2 terimi dışındaki** p değerlerinin hepsi < α =0.05 olduğundan, cos2 dışındaki **terimlerin önemli olduğunu** söyleyebiliriz.
+
+- p-value değeri < α =0.05 olduğundan kurulan **regresyon modelinin anlamlı olduğunu** söyleyebiliriz.
+
+- **cos2 terimi** katsayısı = 0.209  > α =0.05 olduğu için, cos2 terimine ait katsayının **anlamsız olduğunu** söyleyebiliriz.
+
+
+>Bu durumda cos2 değişkeni çıkarılarak tekrardan model anlamlılığına bakılır.
+
+**cos2 teriminin olmadığı modelin oluşturulması:**
+
+```{r}
+regresyon.model3<-lm(data= veri_mev_yeni2, y ~ t+sin1+cos1+sin2)
+summary(regresyon.model3)
+```
+### Modelin Anlamlılığı:
+
+Ho: Model Anlamsızdır.<br/>
+H1: Model Anlamlıdır.
+
+- p-value değeri < α =0.05 olduğundan Ho RED. Kurulan regresyon modelinin **anlamlı olduğunu** söyleyebiliriz.
+
+
+### Durbin-Watson Testi:
+
+Ho: Otokorelasyon sorunu yoktur.<br/>
+H1: Otokorelasyon sorunu vardır.
+
+```{r}
+library(fpp)
+dwtest(data= veri_mev_yeni2, y ~ t+sin1+cos1+sin2)
+```
+
+**Durbin-Watson Test sonucuna göre:**
+
+- DW= 0,3644 değeri 2 ye yakın bir değer olmadığı için (p = 0 < α =0.05) Ho RED. Otokorelasyon sorunu vardır. 
+
+
+### Toplamsal Model ile kurulan Regresyon Analizinin Denklemi :
+
+>Zt = 149488.533 + 368.601t - 14718.379sin(2πt/12) - 7451.037cos(2πt/12) + 22502.238sin(4πt/12) + εi
+olur.
+
+## 4.1.3 Kurulan Model İçin Tahmin, Hata ve Tahminin Sınır Serileri 
+
+**Zt = 149488.533 + 368.601t - 14718.379sin(2πt/12) - 7451.037cos(2πt/12) + 22502.238sin(4πt/12) + εi modeli için:**
+
+
+### Tahmin:
+
+```{r}
+tahmin_model3<-predict(regresyon.model3)
+plot.ts(tahmin_model3)
+```
+
+
+### Alt ve Üst Sınırlar:
+
+```{r}
+sinir_model3<-predict(regresyon.model3, interval = 'confidence' ,level = .95)
+plot.ts(sinir_model3)
+```
+
+### Hata:
+
+```{r}
+hata_model3<-resid(regresyon.model3)
+plot.ts(hata_model3)
+```
+
+### Gerçek Elektrik Tüketimi ve Tahmin Sınırlarının Birlikte Çizilmesi
+
+```{r}
+plot( window(veri_mev_yeni2$y),
+      xlab="", ylab="", type="l", lty=3, col=2, lwd=2)
+lines(window(sinir_model3[,2]) ,type="l",lty=1,col=4,lwd=2)
+lines(window(sinir_model3[,3]) ,type="l",lty=1,col=3,lwd=2)
+legend("topleft",c(expression(paste(Elektri_Tüketimi)),
+                   expression(paste(Altsinir)),
+                   expression(paste(Üstsinir))),
+       lwd=c(2,2,3),lty=c(3,1,2), cex=0.7, col=c(2,4,3))
+
+```
+
+## 4.1.4 Modelin Güvenirliği
+
+Toplamsal Regresyon modelinin orijinal seri üzerinde geçerli bir model olup olmadığını kontrol edelim. 
+
+
+**Orijinal seri ile tahmin serisinin uyumu:**
+
+```{r}
+plot( window(veri_mev_yeni2$y), 
+      xlab="Zaman", ylab="",type="l",lty=1, col=4, lwd=2)
+lines( window(tahmin_model3),lty=3,col=2,lwd=3)
+legend("topleft",c(expression(paste(Elektrik_tüketimi)),
+                   expression(paste(Tahmin))),
+       lwd=c(2,2),lty=c(1,3), cex=0.6, col=c(4,2))
+```
+
+
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Tahmin ile orijinal seri arasında sapmanın yüksek olduğunu dolayısıyla **uyum göstermediğini** söyleyebiliriz. 
+
+- Fakat emin olmak için hataların akgürültü olup olmadığına bakabiliriz.
+
+### Hatalar Akgürültü mü? 
+
+### ! BİLGİ !
+>_**Akgürültü Serisi:** Durağanlık koşullarından tek farkı
+kovaryans teriminin sıfır olmasıdır. Dolayısıyla, akgürültü serisi durağan bir seriden farklı özellikler gösterir. <br/> Örneğin, akgürültü serisi rasgele hareketlere sahip modellenemez bir seri iken durağan serilerin hareketlerinin belli bir sistematiği vardır ve bu nedenle modellenebilmektedir. Akgürültü serisinin tüm gecikmelerindeki otokorelasyon ve kısmi otokorelasyon değerleri önemsizdir._
+
+> ACF ve PACF grafıklerinin yorumunda serinin akgürültü serisi olup olmadığına net bir şekilde karar verilemiyorsa, yani ACF veya PACF grafiklerinde birinci gecikme dışında az sayıda güven sınırını biraz geçen ilişkiler var ise bu durumda seriye Box-Ljung Testi uygulanır.
+
+>Eğer her gecikme için Box-Ljung Testi sonucunda **Ho : rk = 0** yokluk hipotezi kabul edilirse serinin akgürültü serisi olduğu söylenir.
+
+>>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+>> Ho: Hatalar Akgürültüdür.(Hatalar arasında ilişki yoktur.) <br/>
+H1: Hatalar Akgürültü değildir.(Hatalar arasında ilişki vardır.)
+
+
+**Hatalar için ACF Grafiği:**
+
+```{r}
+Acf(hata_model3, lag.max = 42,  ylim=c(-1,1), lwd=5,main="Hatalar için ACF Grafiği")
+```
+
+
+**Hatalar için ACF Grafiğine bakıldığında:**
+
+- Tüm gecikmelerin sınırları geçtiği gözükmektedir.
+
+- Hataların akgürültü olmadığı (Ho RED) Söylenebilir. Box-Ljung testi ile de bunu görebiliriz.
+
+**Box-Ljung Testi:** 
+```{r}
+Box.test(hata_model3,type = "Ljung",lag = 42)
+```
+
+**Box-Ljung test sonucuna bakıldığında:**
+
+- p değeri = 0 < α =0.05 'dir. Yani Ho RED.
+
+- Hatalar Arasında **ilişki olduğunu** yani hataların *akgürültü olmadığını* söyleyebiliriz.
+
+
+## 4.1.5 SONUÇ
+
+**Bir önceki adımda görüldüğü üzere;** 
+
+- _Hatalar Arasında ilişki olduğunu yani hataların akgürültü olmadığını gördük._ 
+
+- _**Sonuç olarak ABD'deki aylık elektrik tüketimi serisinin Regresyon analizi için kullanılan Toplamsal Regresyon denklemi uygun değildir.**_
+
+
+
+## 4.2 Çarpımsal Model İle Regresyon Analizi
+
+### ! BİLGİ !
+>Bu modelde serideki dalgalanma büyüklükleri düzenli bir şekilde artmaktadır. Bu model regresyon analizine uygulandığında trende ve mevsimsel dalgalanmaya sahip bir serinin analizi için uygun olan bir regresyon denklemi:
+
+![ ](https://raw.githubusercontent.com/gungorrbaris/zaman-serisi-analizi-R/main/png/regresyon%C3%87arp%C4%B1msal.png)
+
+biçiminde olmaktadır.
+
+
+>Burada i indisli toplam serinin trendini, i ve j indisli iki toplam ise mevsimselligin çarpımsal biçimde oldugunu göstermektedir.
+
+>Bu denklemde bağımsız degiskenin t serisi ile sinüs fonksiyonu serisini çarpımı, t serisi ile kosinüs fonksiyonu serisinin çarpımı t serisi olduguna dikkat edilmelidir.
+
+>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+
+## 4.2.1 t, Sin ve Cos Terimlerinin oluşturulması
+
+_Serimiz, hem trende hem de mevsimsel dalgalanmaya sahip olduğundan regresyon modelinin; t, sinüs ve kosinüs terimlerini içermesi gerekmektedir._
+
+```{r}
+t <- 1: 1: 587
+```
+
+
+Veride 144 gözlem bulunduğu için bu değerler girilmiştir.
+
+
+```{r}
+s1<-t*sin(2*3.1416*t/12)
+c1<-t*cos(2*3.1416*t/12)
+```
+
+
+Sin ve Cos değerleri bulunurken yazılan formüldeki 12 değeri, daha önceki bölümlerde bulduğumuz periyottur. 
+ 
+**veri, t, sin ve cos terimleri ile yeni bir veri oluşturulur:**
+
+```{r}
+veri_mevC_yeni <- as.data.frame(cbind(veri_ts, t, s1, c1))
+names(veri_mevC_yeni)<- c("y", "t", "s1", "c1")
+
+knitr::kable(head(veri_mevC_yeni), align = "c")
+```
+
+## 4.2.2 Regresyon Modelinin Oluşturulması
+
+### Birinci Harmonik
+
+Oluşturulan yeni veri ile regresyon analizi yapılır. 
+
+```{r}
+regresyon.modelC1<-lm(data = veri_mevC_yeni, y ~ t+s1+c1)
+summary(regresyon.modelC1)
+```
+
+**Birinci Harmonik için Regresyon modeli sonucuna göre:**
+
+- Coefficients kısmındaki p değerlerinin hepsi < α =0.05 olduğundan, modeldeki **tüm terimlerin önemli olduğunu** söyleyebiliriz. 
+
+- p-value değeri < α =0.05 olduğundan kurulan **regresyon modelinin anlamlı olduğunu** söyleyebiliriz.
+
+
+### İkinci Harmonik
+
+Birinci harmonikte tüm terimler anlamlı çıktığından ikinci harmonikte de regresyon denklemine katılırlar. 
+
+**Sin, Cos Terimlerinin oluşturulması:**
+
+```{r}
+s2<-t*sin(2*3.1416*2*t/12)
+c2<-t*cos(2*3.1416*2*t/12)
+```
+
+
+**Yeni Verinin Oluşturulması:**
+
+Yeni veri oluşturulurken birinci harmonikte kullanılan sin ve cos değerleri de eklenir. 
+
+```{r}
+veri_mevC_yeni2 <- as.data.frame(cbind(veri_ts, t, s1, c1, s2, c2))
+
+names(veri_mevC_yeni2)<- c("y", "t", "s1", "c1", "s2", "c2")
+
+knitr::kable(head(veri_mevC_yeni2), align = "c")
+```
+
+**İkinci Harmonik için regresyon modelinin kurulması:**
+
+```{r}
+regresyon.modelC2<-lm(data= veri_mevC_yeni2, y ~ t+s1+c1+s2+c2)
+summary(regresyon.modelC2)
+```
+
+**İkinci Harmonik için Regresyon modeli sonucuna göre:**
+
+- Coefficients kısmındaki p değerlerinin hepsi < α =0.05 olduğundan, modeldeki **tüm terimlerin önemli olduğunu** söyleyebiliriz. 
+
+- p-value değeri < α =0.05 olduğundan kurulan **regresyon modelinin anlamlı olduğunu** söyleyebiliriz.
+
+### Üçüncü Harmonik
+
+İkinci harmonikte tüm terimler anlamlı çıktığından ikinci harmonikte de regresyon denklemine katılırlar. 
+
+**Sin, Cos Terimlerinin oluşturulması:**
+
+```{r}
+s3<-t*sin(2*3.1416*3*t/12)
+c3<-t*cos(2*3.1416*3*t/12)
+```
+
+
+**Yeni Verinin Oluşturulması:**
+
+Yeni veri oluşturulurken birinci harmonikte kullanılan sin ve cos değerleri de eklenir. 
+
+```{r}
+veri_mevC_yeni3 <- as.data.frame(cbind(veri_ts, t, s1, c1, s2, c2,s3,c3))
+
+names(veri_mevC_yeni3)<- c("y", "t", "s1", "c1", "s2", "c2","s3", "c3")
+
+knitr::kable(head(veri_mevC_yeni3), align = "c")
+```
+
+**Üçüncü Harmonik için regresyon modelinin kurulması:**
+
+```{r}
+regresyon.modelC3<-lm(data= veri_mevC_yeni3, y ~ t+s1+c1+s2+c2+s3+c3)
+summary(regresyon.modelC3)
+```
+
+**Üçüncü Harmonik için Regresyon modeli sonucuna göre:**
+
+- Coefficients kısmındaki **s3 terimi dışındaki** p değerleri hepsi < α =0.05 olduğundan, s3 dışındaki **terimlerin önemli olduğunu** söyleyebiliriz.
+
+- p-value değeri < α =0.05 olduğundan kurulan **regresyon modelinin anlamlı olduğunu** söyleyebiliriz.
+
+- **s3 terimi** katsayısı = 0.457328  > α =0.05 olduğu için, s3 terimine ait katsayının **anlamsız olduğunu** söyleyebiliriz.
+
+
+>Bu durumda s3 değişkeni çıkarılarak tekrardan model anlamlılığına bakılır.
+
+
+**s3 teriminin olmadığı modelin oluşturulması:**
+
+```{r}
+regresyon.modelC4<-lm(data= veri_mevC_yeni3, y ~ t+s1+c1+s2+c2+c3)
+summary(regresyon.modelC4)
+```
+### Modelin Anlamlılığı:
+
+Ho: Model Anlamsızdır.<br/>
+H1: Model Anlamlıdır.
+
+- p-value değeri < α =0.05 olduğundan Ho RED. Kurulan regresyon modelinin **anlamlı olduğunu** söyleyebiliriz.
+
+
+### Durbin-Watson Testi:
+
+Ho: Otokorelasyon sorunu yoktur.<br/>
+H1: Otokorelasyon sorunu vardır.
+
+```{r}
+library(fpp)
+
+dwtest(data= veri_mevC_yeni3, y ~ t+s1+c1+s2+c2+c3)
+```
+
+**Durbin-Watson Test sonucuna göre:**
+
+- DW= 0,2914 değeri 2 ye yakın bir değer olmadığı için (p = 0 < α =0.05) Ho RED. Otokorelasyon sorunu vardır. 
+
+
+### Çarpımsal Model ile kurulan Regresyon Analizinin Denklemi :
+
+>Zt = 149480.840 + 368.563t - 47.045sin(2πt/12) - 26.825cos(2πt/12) + 68.915sin(4πt/12) + 8.295cos(4πt/12) + 11.957cos(6πt/12) + εi
+olur.
+
+## 4.2.3 Kurulan Model İçin Tahmin, Hata ve Tahminin Sınır Serileri 
+
+**Zt = 149480.840 + 368.563t - 47.045sin(2πt/12) - 26.825cos(2πt/12) + 68.915sin(4πt/12) + 8.295cos(4πt/12) + 11.957cos(6πt/12) + εi modeli için:**
+
+
+### Tahmin:
+
+```{r}
+tahmin_modelC4<-predict(regresyon.modelC4)
+plot.ts(tahmin_modelC4)
+```
+
+
+### Alt ve Üst Sınırlar:
+
+```{r}
+sinir_modelC4<-predict(regresyon.modelC4, interval = 'confidence' ,level = .95)
+plot.ts(sinir_modelC4)
+```
+
+### Hata:
+
+```{r}
+hata_modelC4<-resid(regresyon.modelC4)
+plot.ts(hata_modelC4)
+```
+
+### Gerçek Elektrik Tüketimi ve Tahmin Sınırlarının Birlikte Çizilmesi
+
+```{r}
+plot( window(veri_mevC_yeni3$y),
+      xlab="", ylab="", type="l", lty=3, col=2, lwd=2)
+lines(window(sinir_modelC4[,2]) ,type="l",lty=1,col=4,lwd=2)
+lines(window(sinir_modelC4[,3]) ,type="l",lty=1,col=3,lwd=2)
+legend("topleft",c(expression(paste(Elektri_Tüketimi)),
+                   expression(paste(Altsinir)),
+                   expression(paste(Üstsinir))),
+       lwd=c(2,2,3),lty=c(3,1,2), cex=0.7, col=c(2,4,3))
+
+```
+
+## 4.2.4 Modelin Güvenirliği
+
+Çarpımsal Regresyon modelinin orijinal seri üzerinde geçerli bir model olup olmadığını kontrol edelim. 
+
+
+**Orijinal seri ile tahmin serisinin uyumu:**
+
+```{r}
+plot( window(veri_mevC_yeni3$y), 
+      xlab="Zaman", ylab="",type="l",lty=1, col=4, lwd=2)
+lines( window(tahmin_modelC4),lty=3,col=2,lwd=3)
+legend("topleft",c(expression(paste(Elektrik_tüketimi)),
+                   expression(paste(Tahmin))),
+       lwd=c(2,2),lty=c(1,3), cex=0.6, col=c(4,2))
+```
+
+
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Tahmin ile orijinal seri arasında sapmanın yüksek olduğunu dolayısıyla **uyum göstermediğini** söyleyebiliriz. 
+
+- Fakat emin olmak için hataların akgürültü olup olmadığına bakabiliriz.
+
+### Hatalar Akgürültü mü? 
+
+### ! BİLGİ !
+>_**Akgürültü Serisi:** Durağanlık koşullarından tek farkı
+kovaryans teriminin sıfır olmasıdır. Dolayısıyla, akgürültü serisi durağan bir seriden farklı özellikler gösterir. <br/> Örneğin, akgürültü serisi rasgele hareketlere sahip modellenemez bir seri iken durağan serilerin hareketlerinin belli bir sistematiği vardır ve bu nedenle modellenebilmektedir. Akgürültü serisinin tüm gecikmelerindeki otokorelasyon ve kısmi otokorelasyon değerleri önemsizdir._
+
+> ACF ve PACF grafıklerinin yorumunda serinin akgürültü serisi olup olmadığına net bir şekilde karar verilemiyorsa, yani ACF veya PACF grafiklerinde birinci gecikme dışında az sayıda güven sınırını biraz geçen ilişkiler var ise bu durumda seriye Box-Ljung Testi uygulanır.
+
+>Eğer her gecikme için Box-Ljung Testi sonucunda **Ho : rk = 0** yokluk hipotezi kabul edilirse serinin akgürültü serisi olduğu söylenir.
+
+>>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ 
+
+>> Ho: Hatalar Akgürültüdür.(Hatalar arasında ilişki yoktur.) <br/>
+H1: Hatalar Akgürültü değildir.(Hatalar arasında ilişki vardır.)
+
+
+**Hatalar için ACF Grafiği:**
+
+```{r}
+Acf(hata_modelC4, lag.max = 42,  ylim=c(-1,1), lwd=5,main="Hatalar için ACF Grafiği")
+```
+
+
+**Hatalar için ACF Grafiğine bakıldığında:**
+
+- Tüm gecikmelerin sınırları geçtiği gözükmektedir.
+
+- Hataların akgürültü olmadığı (Ho RED) Söylenebilir. Box-Ljung testi ile de bunu görebiliriz.
+
+**Box-Ljung Testi:** 
+
+```{r}
+Box.test(hata_modelC4,type = "Ljung",lag = 42)
+```
+
+**Box-Ljung test sonucuna bakıldığında:**
+
+- p değeri = 0 < α =0.05 'dir. Yani Ho RED.
+
+- Hatalar Arasında **ilişki olduğunu** yani hataların *akgürültü olmadığını* söyleyebiliriz.
+
+
+## 4.2.5 SONUÇ
+
+**Bir önceki adımda görüldüğü üzere;** 
+
+- _Hatalar Arasında ilişki olduğunu yani hataların akgürültü olmadığını gördük._ 
+
+- _**Sonuç olarak ABD'deki aylık elektrik tüketimi serisinin Regresyon analizi için kullanılan Çarpımsal Regresyon denklemi uygun değildir.**_
+
+
+## 4.Bölüm Özet
+
+Bu bölümde; Mevsimsel seriler için kullanılan Regresyon Analizi yöntemleri ile ABD'deki aylık elektrik tüketimini tahmin etmeye çalıştık. Fakat uyguladığımız iki model de tahmin etmekte eksik kaldı.
+
+Bundan sonra sırasıyla:
+
+- Üstel Düzleştirme Yöntemi
+
+- Box-Jenkins Modelleri uygulanacaktır. 
+
+
+

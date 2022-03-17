@@ -1,0 +1,50 @@
+---
+title: "rapor"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+
+# BÖLÜM 1: GİRİŞ
+
+## 1.1 Veri
+
+Analiz boyunca kullanılaan veri, ABD Enerji Bilgi Yönetim İdaresi (eia) tarafından 1973-2021 yılları arasında tutulan aylık elektrik tüketimi verisidir.
+
+Veriye buradan ulaşabilirsiniz: [Veri](https://www.eia.gov/totalenergy/data/browser/xls.php?tbl=T07.06&freq=m)     /            [eia](https://www.eia.gov/totalenergy/data/monthly/)
+
+### 1.1.1 Verinin yüklenmesi:
+```{r}
+veri <- read.csv("https://raw.githubusercontent.com/gungorrbaris/zaman-serisi-analizi-R/main/data/Table_7.6_Electricity_End_Use.csv")
+knitr::kable(head(veri), align = "c")
+```
+
+
+### 1.1.2 Verinin Düzenlenmesi:
+
+Tarih değişkenini Ay-Yıl formatına getirelim:
+```{r}
+tarih = seq(from = as.Date("1973-01-01"), to = as.Date("2021-11-01"), by = 'month')
+veri$Month <- tarih
+veri$Month <-format(veri$Month, "%m-%Y")
+knitr::kable(head(veri), align = "c")
+```
+
+
+Değişken isimlerini türkçeleştirelim:
+```{r}
+colnames(veri) <- c("Tarih","Elektrik_Tuketimi")
+knitr::kable(head(veri), align = "c")
+```
+
+
+
+
