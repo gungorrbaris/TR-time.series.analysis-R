@@ -1,0 +1,253 @@
+---
+title: "box"
+output: html_document
+date: '2022-05-30'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# BÖLÜM 6: BOX - JENKİNS MODELLERİ
+ 
+ >Box-Jenkins modelleri, geçen bölümde anlatılan üstel düzleştirme yöntemlerinin genelleştirilmiş biçimi olup mevsimsel ve mevsimsel olmayan
+modeller şeklinde ikiye ayrılmaktadır. <br/>
+ 
+
+>Box-Jenkins Yöntemi, sırasıyla seriye uygun _modeli belirleme_, _modelin tahmini_, _tanısal denetimi_ ve _öngörü_ işllemlerini içermektedir. Bu işlemlerin yapılabilmesi için öncelikle serinin trentten ve mevsimsel dalgalanmadan arındırılınış olmasına, yani serinin **durağan** olmasına dikkat edilmelidir.<br/>
+Durağan olan ya da durağan hale dönüştürülen serinin ACF ve PACF grafiklerine göre seriye uygun olabikecek model belirlenir. Bu belirleme işlemine göre, eğer ACF grafiğindeki ilişki miktarları gecikme sayısı arttıkça yavaş yavaş azalıyor, ama PACF grafiğinde bu azalma bir anda, yani hızlı bir şekilde oluyorsa seriye uygun model **otoregresyon** modeli olmaktadır. Bunun tam tersi, yani PACF grafiğindeki ilişki miktarları yavaş yavaş azalırken ACF grafiğindeki ilişki miktarları hızlı bir şekilde azalıyorsa model **hareketli ortalama** modeli olmaktadır. Hem ACF hem de PACF grafıklerinde ilişki miktarlarının azalışı yavaş yavaş olursa model **otoregresif hareketli ortalama** modeli olmaktadır. <br/>
+Ancak, bu azalışların hızlı ya da yavaş olduğuna karar verebilmek oldukça güç olup doğru kararların verilebilmesi için de yılların deneyimi gerekmektedir. Bu nedenle, verilen kararın doğru olup olmadığını anlayabilmek için modeldeki katsayıların _önemlilik testi_ sonucuna bakılmaktadır. ACF ve PACF grafıklerinden karar verilen modelin katsayılarından herhangi biri istatistiksel olarak önemsiz ise bu modelin seriye uygun olmadığı anlaşılır. Buradan, grafıklerin yanlış yorumlandığı ortaya çıkar.<br/>
+Dolayısıyla, model belirleme işleminin devamı olarak modelin katsayılarının tahmini işlemi de önemli olmakta ve bu iki işlem birbirini tamamlamaktadır. 
+<br/>
+
+
+
+>>**Kaynak:** _Prof. Dr. Cem Kadılar, Dr. Hatice Öncel Çekim SPSS ve R Uygulamalı Zaman Serileri Analizine Giriş_ <br/>
+
+**[Buradaki](#mevsimsellik) başlıkta; Trende sahip serinin birinci farkını aldığımızda serinin aynı zamanda mevsimselliğe sahip olduğunu ACF grafiğine bakarak açıklamıştık.**
+
+>Kullandığımız veri mevsimselliğe sahip olduğu için bu bölümde sadece **Mevsimsel Box-Jenkins modelleri ** gösterilecektir.<br/>
+
+>**Mevsimsel Box-Jenkins modelleri üç farklı model barındırır. Bunlar;**
+- mevsimsel otoregresyon (SAR)
+- mevsiınsel hareketli ortalama (SMA)
+- mevsimsel otoregresif hareketli ortalama (SARMA) modelleridir.<br/> 
+
+>Mevsimsel Box-Jenkins modelleri genelde ARIMA(p,d,q)(P,D,Q)s biçiminde ifade edilmektedir.
+Burada,
+- p otoregresyon (AR) modelinin derecesi, 
+- d fark alma işlemi sayısı 
+- q hareketli ortalama (MA) modelinin derecesi
+- P mevsimsel otoregresyon (SAR) modelinin derecesi, 
+- D mevsimsel fark alma işlemi sayısı, 
+- Q mevsimsel hareketli ortalama (SMA) modelinin derecesi 
+- s periyot 
+olmaktadır.
+
+##  Zaman Serisi Grafiğinin Çizilmesi
+
+```{r}
+
+ts.plot(veri_ts,gpars=list(xlab="Zaman", ylab="Elektrik Tüketimi"))
+```
+
+
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Pozitif yönlü artış vardır. Bu yüzden Serinin artan bir **trende sahip** olduğunu söyleyebiliriz.
+
+- Seride düzenli dalgalanmaların olduğu görülmektedir. Bu seride **mevsimsellik** olabileceğini gösterir.
+Daha kesin sonuç için ACF grafiğini çizelim.
+
+
+## ACF ve PACF Grafiğinin Çizilmesi
+
+>**Seride trendin olduğunu anlamak için ACF grafiğindeki ilk dört gecikmeye bakmak yeterlidir. İlk dört gecikme sınırlar dışındaysa seri için "trende sahiptir" diyebiliriz.**
+
+```{r}
+library(fpp)
+Acf(veri_ts,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Orijinal veri ACF Grafiği")
+```
+
+
+**ACF Grafiğine bakıldığında:**
+
+- Tüm gecikmeler (4 gecikme olması yeterlidir) sınırlar dışında olduğu için zaman serisinin **trende sahip** olduğu söylenebilir. Bu yüzden serinin farkı alınıp durağan hale getirilmelidir.
+
+- Trend ile birlikte düzenli dalgalanmaların olduğu gözükse de baskın bir mevsimsellikten şu an için bahsedemeyiz.
+
+
+```{r}
+Pacf(veri_ts,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Orijinal seri PACF Grafiği")
+```
+
+
+##  Birinci Farkın Alınması
+
+```{r}
+veri_birinci_fark <- diff(veri_ts, differences = 1)
+```
+
+## Farkı alınmış seri için ACF ve PACF:
+```{r}
+Acf(veri_birinci_fark,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Birinci Fark sonrası ACF Grafiği")
+```
+
+
+```{r}
+Pacf(veri_birinci_fark,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Birinci Fark sonrası ACF Grafiği")
+```
+
+**Birinci Farkı alınmış seri için ACF Grafiğine bakıldığında:**
+
+- Yine tüm gecikmeler sınırlar dışında olduğu için birinci farkı alınmış zaman serisinin de trende sahip olduğu söylenebilir. Fakat bir öncekine göre bu ACF grafiğinde baskın bir **mevsimsellik** görülüyor. Dalgalanmalar ve gecikmelerdeki düzenli sıçramalar bunu destekliyor.  
+
+###Birinci Mevsimsel Farkın Alınması
+
+```{r}
+veri_ts_mev1 <- diff(veri_birinci_fark,12)
+
+```
+
+
+## Mevsimsel Farkı alınmış seri için ACF ve PACF:
+
+```{r}
+Acf(veri_ts_mev1,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Birinci Mevsimsel Fark sonrası ACF Grafiği")
+```
+
+
+**Birinci Mevsimsel Farkı alınmış seri için ACF Grafiğine bakıldığında:**
+
+- İlk dört gecikmeden sadece iki tanesi sınırları geçtiği için **trendin kaybolduğunu** söyleyebiliriz.
+
+- Düzenli dalgalanmaların dolayısıyla **mevsimselliğin de kaybolduğunu** söyleyebiliriz. 
+>Seriyi durağan hale getirmek için; 
+- Bir kez fark aldığımız için -> **d=1**
+- Bir kez mevsimsel fark adlığımız için -> **D=1**
+
+## Durağan Serinin ACF ve PACF Yorumu:
+
+```{r}
+Acf(veri_ts_mev1,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Durağan Seri ACF Grafiği")
+```
+
+
+```{r}
+Pacf(veri_ts_mev1,lag.max = 42,  ylim=c(-1,1), lwd=5,main="Durağan Seri PACF Grafiği")
+```
+
+
+**Durağan hale gelmiş serinin ACF ve PACF Grafiklerine bakıldığında:**
+
+- ACF deki düşüşün daha sert olduğu söylenebilir. (ilk iki gecikmeler nerdeyse aynı seviyede. üçüncü gecikmelere bakıldığında ACF'deki gecikme PACF'ye göre daha fazladır.)
+
+- Fakat bu yorum kesin ve belirgin bir yorum değildir. Grafiklere bakarak modeli anlayabilmek çok zordur. **Bu yüzden en iyi modeli bulmak için auto.arima() fonksiyonu kullanılacaktır.**    
+
+> auto.arima() fonksiyonunun sağlıklı çalışabilmesi için parmatrelerin doğru verilmesi gerekmektedir.
+
+> d ve D değerlerinin 1 olduğunu göstermiştik. Şimdi de p, q ve Q değerlerini bulalım:
+>> ACF grafiğine bakıldığında (SMA modelleri) ilk 3 gecikmede 2 gecikmenin sınırları geçtiği görülüyor. Buradan q değerinin maksimum 2 olacağını söyleyebiliriz. 
+>> PACF grafiğine bakıldığında (SAR modelleri) ilk 3 gecikmede 3 gecikmenin sınırları geçtiği görülüyor. Buradan p değerinin maksimum 3 olacağını söyleyebiliriz.
+>> P ve Q değerlerinin maksimum 3 olacağını söyleyebiliriz. 
+
+**Sonuç olarak:**
+ q = 1 ve 2 
+ p = 1, 2, ve 3
+ d = 1
+ D = 1
+ Q = 0, 1, 2 ve 3
+ P = 0, 1, 2 ve 3 değerlerini alabilirler.
+ 
+
+**Bu değerler ile en iyi modelin kodlarını yazalım:**
+
+## En İyi SARIMA Modelinin Bulunması
+
+
+```{r}
+library(forecast)
+en_iyi_model <- auto.arima(veri_ts,max.p = 2,max.q = 2,max.P = 3,max.Q = 3,d=1,D=1,seasonal = TRUE,ic = 'aicc')
+summary(en_iyi_model)
+```
+
+**Model Özetine bakıldığında:**
+
+- En iyi model bulunurken; AR1 ve AR2  Otoregresyon modelleri, MA1 ve SMA1 Hareketli ortalama modelleri kullanımıştır. 
+- En iyi modelin **ARIMA(2,1,1)(0,1,1)[12]** olduğu görülmektedir. 
+- ARIMA(2,1,1)(0,1,1)[12] modelinin AIC değeri 11616.41'dir.
+
+
+## En iyi Modelin Tahmin, Hata ve Öngörüleri:
+
+### Tahmin:
+
+```{r}
+tahmin21<- en_iyi_model[["fitted"]]
+```
+
+### Hata:
+
+```{r}
+hata21<- en_iyi_model[["residuals"]]
+```
+
+### Tahmin ve Orijinal Serinin Birlikte Çizilmesi:
+
+```{r}
+plot( window(veri_ts), 
+      xlab="Zaman (Yıl)", ylab="",lty=1, col=4, lwd=2)
+lines( window(tahmin21) ,lty=3,col=2,lwd=3)
+legend("topleft",c(expression(paste(Elektrik_Tüketimi)),
+               expression(paste("ARIMA(2,1,1)(0,1,1)[12]"))),
+       lwd=c(2,2),lty=c(1,3), cex=0.7, col=c(4,2))
+```
+**Zaman Serisi Grafiğine bakıldığında:**
+
+- Tahmin ile orijinal seri arasında **uyum olduğu** görülmektedir. Yani görsel olarak Box-Jenkins yöntemi ile kurulan modelin tahminlerinin gerçeğe yakın olduğunu söyleyebiliriz. 
+
+- Fakat emin olmak için hataların akgürültü olup olmadığına bakmamız gerekmektedir.
+
+### Hatalar Akgürültü mü? 
+
+
+>> Ho: Hatalar Akgürültüdür.(Hatalar arasında ilişki yoktur.) <br/>
+H1: Hatalar Akgürültü değildir.(Hatalar arasında ilişki vardır.)
+
+
+**Hatalar için ACF Grafiği:**
+
+```{r}
+Acf(hata21, lag.max = 42,  ylim=c(-1,1), lwd=5,main="Hatalar için ACF Grafiği")
+```
+
+
+**Hatalar için ACF Grafiğine bakıldığında:**
+
+- İlk dört gecikmenin de sınırlar içinde kaldığı görülmektedir. 
+
+- Hataların akgürültü olduğunu söyleyebiliriz. Yani Hatalar arasında ilişki yoktur. Kurulan model tahmin etmede kullanılabilir. 
+
+
+
+### ARIMA Modeli ile 2022 yılının elektrik Tüketim Öngörüsü:
+```{r}
+ongoru21<- forecast(en_iyi_model, h=12)
+knitr::kable(ongoru21[["mean"]],col.names = "ARIMA(2,1,1)(0,1,1)[12] Modelinin 2022 için aylık Elektrik Tüketim Tahminleri",align = "c")
+```
+
+
+
+### ARIMA Modeli ile elektrik Tüketim Öngörüsü:
+
+
+```{r}
+plot(forecast(en_iyi_model,h=120),main = "ARIMA(2,1,1)(0,1,1)[12] modelinin İlerleyen Yıllar İçin Tahminleri")
+```
+
+## 6.Bölüm Özet
+
+Bu bölümde; Box-Jenkins modelleri ile ABD'deki aylık elektrik tüketimini tahmin etmeye çalıştık. Fonksiyon yardımı ile bulduğumuz en iyi model veriyi tahmin etmede iyi sonuçlar verdi. 
+
+Sonuç olarak ABD'deki aylık elektrik tüketimi serisinin tahmini için  Box-Jenkins modelleri uygundur ve kullanılabilir.
